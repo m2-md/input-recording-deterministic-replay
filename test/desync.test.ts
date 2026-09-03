@@ -5,9 +5,9 @@ import type { Rng } from "../src/rng";
 import { recordSession } from "../src/session";
 import { panicPilot, step, type State } from "../src/sim";
 
-describe("desync avı: aynı kayıt, iki farklı build", () => {
-  // "Yeni build": 300. tick'te spawn sayacına milyonda bir kayma giriyor.
-  // Ekranda hiçbir şey görünmez; hash anında görür.
+describe("hunting desync: same recording, two different builds", () => {
+  // "new build": at tick 300, spawn timer drifts by one in a million.
+  // Nothing visible on screen; hash detects it immediately.
   const driftedStep = (
     state: State,
     input: InputBits,
@@ -19,7 +19,7 @@ describe("desync avı: aynı kayıt, iki farklı build", () => {
     return next;
   };
 
-  it("kaba iz ayrılmayı bulur, ince iz tam kareyi verir", () => {
+  it("coarse trail detects divergence, fine trail pinpoints exact frame", () => {
     const { recording } = recordSession(20260723, panicPilot, 900, 30);
     const coarse = replayWithTrail(recording, { stepFn: driftedStep });
     expect(findDivergence(recording.trail, coarse.trail)).toBe(330);

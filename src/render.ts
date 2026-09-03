@@ -13,7 +13,7 @@ const REPLAY = {
   trail: "#241a26",
 };
 
-/** SADECE çizer. Karar vermez, durum değiştirmez. */
+/** Rendering only. Makes no decisions, does not mutate state. */
 export function render(
   ctx: CanvasRenderingContext2D,
   state: State,

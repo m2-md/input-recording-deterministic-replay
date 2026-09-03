@@ -1,7 +1,7 @@
-/** 0..1 arası sayı üreten deterministik kaynak. */
+/** Deterministic source producing numbers between 0 and 1. */
 export type Rng = () => number;
 
-/** mulberry32: küçük, hızlı, tohumlu PRNG. Aynı tohum → aynı dizi. */
+/** mulberry32: small, fast, seeded PRNG. Same seed → same sequence. */
 export function mulberry32(seed: number): Rng {
   let s = seed | 0;
   return () => {

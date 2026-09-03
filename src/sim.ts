@@ -36,14 +36,14 @@ const SIDE_ACC = 1100; // px/s²
 const DRAG_X = 2.4; // 1/s
 const DRAG_Y = 0.8; // 1/s
 const SHIP_R = 12;
-const SPAWN_EVERY = 0.32; // saniye
+const SPAWN_EVERY = 0.32; // seconds
 const ROCK_MIN_R = 10;
 const ROCK_MAX_R = 26;
-const ROCK_MIN_VX = 170; // px/s (sola doğru)
+const ROCK_MIN_VX = 170; // px/s (towards the left)
 const ROCK_MAX_VX = 320;
 const KNOCKBACK = 260; // px/s
 
-/** Her oturumun başladığı yer. Kaydın örtük başlangıç durumu budur. */
+/** Starting point for every session. Implicit initial state of the recording. */
 export function createState(): State {
   return {
     tick: 0,
@@ -58,8 +58,8 @@ export function createState(): State {
 }
 
 /**
- * Oyunun tek gerçeği. DOM yok, Math.random yok, Date.now yok.
- * (state, input, dt, rng) dörtlüsü sonucu tam belirler.
+ * Single source of truth for the game. No DOM, no Math.random, no Date.now.
+ * The (state, input, dt, rng) tuple deterministically determines the outcome.
  */
 export function step(
   state: State,
@@ -67,7 +67,7 @@ export function step(
   dt: number,
   rng: Rng,
 ): State {
-  // 1) Girdi → ivme
+  // 1) Input → acceleration
   const s = state.ship;
   let ax = 0;
   if (has(input, LEFT)) ax -= SIDE_ACC;
@@ -80,7 +80,7 @@ export function step(
   let x = s.x + vx * dt;
   let y = s.y + vy * dt;
 
-  // 2) Duvarlar
+  // 2) Walls
   if (x < s.r) {
     x = s.r;
     vx = 0;
@@ -96,7 +96,7 @@ export function step(
     vy = 0;
   }
 
-  // 3) Kayalar: sola akar, ekranı geçen atlatılmış sayılır, değen vurur.
+  // 3) Rocks: move left; off-screen means dodged; contact means hit.
   const rocks: Rock[] = [];
   let dodged = state.dodged;
   let hits = state.hits;
@@ -119,7 +119,7 @@ export function step(
     rocks.push({ id: rock.id, x: rx, y: rock.y, r: rock.r, vx: rock.vx });
   }
 
-  // 4) Doğurma: rastgelelik SADECE parametreden gelen rng'den.
+  // 4) Spawning: randomness solely comes from the parameterized RNG.
   let spawnTimer = state.spawnTimer + dt;
   let nextId = state.nextId;
   while (spawnTimer >= SPAWN_EVERY) {
@@ -146,7 +146,7 @@ export function step(
   };
 }
 
-/** Duruma bakıp girdi üreten deterministik senaryo (test "pilotu"). */
+/** Deterministic policy generating inputs from state (testing "pilot"). */
 export type Pilot = (state: State) => InputBits;
 
 export function panicPilot(state: State): InputBits {
@@ -166,10 +166,10 @@ export function panicPilot(state: State): InputBits {
   }
   if (threat && best < 180) {
     const dy = threat.y - ship.y;
-    // Kaya altımdaysa yukarı kaç, üstümdeyse gazı kes.
+    // If rock is below me, thrust upwards; if above, cut thrust.
     if (dy > 0) input |= THRUST;
     else input &= ~THRUST;
-    // Hizadaysam frene bas, değilse ileri devam.
+    // If aligned, steer away/brake, otherwise continue forward.
     input |= Math.abs(dy) < threat.r + ship.r + 20 ? LEFT : RIGHT;
   }
   return input;

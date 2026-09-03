@@ -3,13 +3,13 @@ import type { InputBits } from "./input";
 import { mulberry32, type Rng } from "./rng";
 import { createState, step, type State } from "./sim";
 
-/** Aynı girdinin arka arkaya kaç tick sürdüğü. Kayıt formatının tamamı bu. */
+/** Consecutive tick count of identical input. This constitutes the whole recording format. */
 export interface InputRun {
   input: InputBits;
   count: number;
 }
 
-/** Belirli bir tick'teki durum parmak izi. */
+/** State fingerprint at a specific tick. */
 export interface HashSample {
   tick: number;
   hash: number;
@@ -18,15 +18,15 @@ export interface HashSample {
 export interface Recording {
   version: 1;
   seed: number;
-  tickRate: number; // tick/saniye
-  ticks: number; // toplam tick sayısı
-  runs: InputRun[]; // run-length kodlanmış girdi
-  trailEvery: number; // hash izinin örnekleme aralığı
+  tickRate: number; // tick/second
+  ticks: number; // total tick count
+  runs: InputRun[]; // run-length encoded input
+  trailEvery: number; // sampling interval of the hash trail
   trail: HashSample[];
   finalHash: number;
 }
 
-/** Tick başına girdi dizisini tekrar bloklarına indirger. Saf. */
+/** Compresses per-tick input sequence into runs. Pure. */
 export function encodeRuns(inputs: readonly InputBits[]): InputRun[] {
   const runs: InputRun[] = [];
   for (const input of inputs) {
@@ -37,7 +37,7 @@ export function encodeRuns(inputs: readonly InputBits[]): InputRun[] {
   return runs;
 }
 
-/** encodeRuns'ın tam tersi. decode(encode(x)) === x. */
+/** Exact inverse of encodeRuns. decode(encode(x)) === x. */
 export function decodeRuns(runs: readonly InputRun[]): InputBits[] {
   const inputs: InputBits[] = [];
   for (const run of runs) {
@@ -46,7 +46,7 @@ export function decodeRuns(runs: readonly InputRun[]): InputBits[] {
   return inputs;
 }
 
-/** Blokları açmadan toplam tick sayısı. */
+/** Total tick count without expanding runs. */
 export function runsLength(runs: readonly InputRun[]): number {
   let n = 0;
   for (const run of runs) n += run.count;
@@ -64,7 +64,7 @@ export class Recorder {
     readonly trailEvery = 30,
   ) {}
 
-  /** Bir tick'i kaydet: o tick'e verilen girdi ve tick sonrası durum. */
+  /** Record one tick: input provided at that tick and state after tick. */
   capture(input: InputBits, after: State): void {
     const last = this.runs[this.runs.length - 1];
     if (last && last.input === input) last.count += 1;
@@ -102,7 +102,7 @@ export interface ReplayResult {
   trail: HashSample[];
 }
 
-/** `step` ile aynı imzayı taşıyan her şey replay edilebilir. */
+/** Anything carrying the same signature as step can be replayed. */
 export type StepFn = (
   state: State,
   input: InputBits,
@@ -111,13 +111,13 @@ export type StepFn = (
 ) => State;
 
 export interface ReplayOptions {
-  /** Kaç tick'te bir hash örneği alınsın. 1 = her tick. */
+  /** How often to sample state hash. 1 = every tick. */
   trailEvery?: number;
-  /** Hangi simülasyonla oynatılsın. Varsayılan: projenin `step`'i. */
+  /** Simulation step function to run replay with. Default: project's step. */
   stepFn?: StepFn;
 }
 
-/** Kaydı baştan sona yeniden oynatır ve hash izini toplar. */
+/** Replays recording from start to finish and collects hash trail. */
 export function replayWithTrail(
   rec: Recording,
   options: ReplayOptions = {},
@@ -137,14 +137,14 @@ export function replayWithTrail(
   return { state, trail };
 }
 
-/** Sadece son durumu isteyenler için kısayol. */
+/** Shortcut for callers only interested in final state. */
 export function replay(rec: Recording): State {
   return replayWithTrail(rec).state;
 }
 
 /**
- * İki hash izini karşılaştırır, ilk ayrıldıkları örneğin tick'ini döndürür.
- * Aynıysa null. Çözünürlük, izin örnekleme aralığı kadardır.
+ * Compares two hash trails and returns the tick of the first sample where they diverge.
+ * Null if identical. Resolution matches the trail's sampling interval.
  */
 export function findDivergence(
   a: readonly HashSample[],
@@ -166,7 +166,7 @@ export interface VerifyResult {
   expectedHash: number;
 }
 
-/** Kayıt kendi hash izini tutuyor mu? Tutmuyorsa nerede koptu? */
+/** Does the recording match its own hash trail? If not, where did it diverge? */
 export function verifyRecording(rec: Recording): VerifyResult {
   const { state, trail } = replayWithTrail(rec);
   const divergedAt = findDivergence(rec.trail, trail);
@@ -186,10 +186,10 @@ export function serialize(rec: Recording): string {
 export function parseRecording(json: string): Recording {
   const rec = JSON.parse(json) as Recording;
   if (rec.version !== 1)
-    throw new Error(`bilinmeyen kayıt sürümü: ${rec.version}`);
+    throw new Error(`unknown recording version: ${rec.version}`);
   if (runsLength(rec.runs) !== rec.ticks) {
     throw new Error(
-      `bozuk kayıt: runs ${runsLength(rec.runs)} tick, başlıkta ${rec.ticks}`,
+      `corrupt recording: runs ${runsLength(rec.runs)} ticks, header specifies ${rec.ticks}`,
     );
   }
   return rec;

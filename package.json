@@ -1,7 +1,7 @@
 {
   "name": "input-recording-deterministic-replay",
   "version": "1.0.0",
-  "description": "Kara kutu: girdi kaydı ve deterministik replay (Kanyon mini oyunu) — RLE kayıt formatı, hash izi, desync avı",
+  "description": "Black-box input capture and deterministic replay harness for canvas games: compact RLE recording format, state checksum hashing, and desync regression testing.",
   "type": "module",
   "license": "MIT",
   "scripts": {

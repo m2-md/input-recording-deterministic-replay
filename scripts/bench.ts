@@ -13,7 +13,7 @@ import { recordSession, TICK_RATE } from "../src/session";
 import { createState, panicPilot, step, type State } from "../src/sim";
 
 const SEED = 20260723;
-const TICKS = 1800; // 30 saniye
+const TICKS = 1800; // 30 seconds
 const RUNS = 50;
 const WARMUP = 20;
 
@@ -34,11 +34,11 @@ function measure(fn: () => void): number {
 const plain = measure(() => replay(recording));
 const traced = measure(() => replayWithTrail(recording, { trailEvery: 1 }));
 
-// --- Sıkıştırma: bot pilot vs insan benzeri girdi -------------------------
-const rawBytes = (n: number) => n * 4; // tick başına 4 bayt ham girdi
-const runBytes = (n: number) => n * 4; // blok başına {input:u8, count:u24}
+// --- Compression: bot pilot vs human-like input -------------------------
+const rawBytes = (n: number) => n * 4; // 4 bytes raw input per tick
+const runBytes = (n: number) => n * 4; // {input:u8, count:u24} per block
 
-/** Tuşları 6–45 tick basılı tutan, insana benzer girdi akışı. */
+/** Human-like input stream holding keys down for 6–45 ticks. */
 function humanInputs(rng: Rng, ticks: number): InputBits[] {
   const out: InputBits[] = [];
   while (out.length < ticks) {
@@ -53,7 +53,7 @@ const botRuns = recording.runs.length;
 const human = humanInputs(mulberry32(99), 3600);
 const humanRuns = encodeRuns(human).length;
 
-// --- Desync: hash ne zaman görür, göz ne zaman görür? ---------------------
+// --- Desync: when does hash detect vs when does human eye detect? ---------------------
 const driftedStep = (
   state: State,
   input: InputBits,
@@ -76,7 +76,7 @@ const coarseTick = findDivergence(
   replayWithTrail(recording, { stepFn: driftedStep }).trail,
 );
 
-/** Ekrana yansıyan ilk fark: 1 px'den fazla kayma ya da sayaç/kaya değişimi. */
+/** First visible difference on screen: >1px drift or counter/rock change. */
 function firstVisibleDivergence(): number | null {
   const inputs = decodeRuns(recording.runs);
   const dt = 1 / recording.tickRate;
@@ -103,33 +103,33 @@ function firstVisibleDivergence(): number | null {
 const visibleTick = firstVisibleDivergence();
 
 const simSeconds = TICKS / TICK_RATE;
-console.log("Kanyon — kayıt boyutu + replay hızı");
+console.log("Canyon — recording size + replay speed");
 console.log(
-  `sahne: tohum=${SEED} · ${TICKS} tick (${simSeconds.toFixed(1)} sn sim) · ${RUNS} koşu, ${WARMUP} ısınma\n`,
+  `scene: seed=${SEED} · ${TICKS} ticks (${simSeconds.toFixed(1)} s sim) · ${RUNS} runs, ${WARMUP} warmup\n`,
 );
 
-console.log("replay hızı");
+console.log("replay speed");
 console.log(
-  `  replay (hashsiz)   : ${plain.toFixed(2)} ms · ${(TICKS / plain).toFixed(0)} kare/ms · gerçek zamanın ${Math.round(simSeconds / (plain / 1000)).toLocaleString("en-US")}x'i`,
+  `  replay (no hash)        : ${plain.toFixed(2)} ms · ${(TICKS / plain).toFixed(0)} frames/ms · ${Math.round(simSeconds / (plain / 1000)).toLocaleString("en-US")}x real-time`,
 );
 console.log(
-  `  replay + her tick hash: ${traced.toFixed(2)} ms · ${(TICKS / traced).toFixed(0)} kare/ms\n`,
+  `  replay + hash per tick  : ${traced.toFixed(2)} ms · ${(TICKS / traced).toFixed(0)} frames/ms\n`,
 );
 
-console.log("kayıt boyutu");
+console.log("recording size");
 console.log(
-  `  bot pilot          : ${TICKS} tick → ${botRuns} blok · ${rawBytes(TICKS)} B ham → ${runBytes(botRuns)} B run (${(rawBytes(TICKS) / runBytes(botRuns)).toFixed(1)}x)`,
+  `  bot pilot               : ${TICKS} ticks → ${botRuns} blocks · ${rawBytes(TICKS)} B raw → ${runBytes(botRuns)} B run (${(rawBytes(TICKS) / runBytes(botRuns)).toFixed(1)}x)`,
 );
 console.log(
-  `  insan benzeri girdi: ${human.length} tick → ${humanRuns} blok · ${rawBytes(human.length)} B ham → ${runBytes(humanRuns)} B run (${(rawBytes(human.length) / runBytes(humanRuns)).toFixed(1)}x)`,
+  `  human-like input        : ${human.length} ticks → ${humanRuns} blocks · ${rawBytes(human.length)} B raw → ${runBytes(humanRuns)} B run (${(rawBytes(human.length) / runBytes(humanRuns)).toFixed(1)}x)`,
 );
-console.log(`  JSON kayıt dosyası : ${serialize(recording).length} B\n`);
+console.log(`  JSON recording file     : ${serialize(recording).length} B\n`);
 
-console.log("desync görünürlüğü (spawnTimer += 1e-6 @ tick 300)");
-console.log(`  kaba iz (30 tick)  : tick ${coarseTick}`);
-console.log(`  ince iz (1 tick)   : tick ${hashTick}`);
-console.log(`  gözle görülür fark : tick ${visibleTick}`);
+console.log("desync visibility (spawnTimer += 1e-6 @ tick 300)");
+console.log(`  coarse trail (30 ticks) : tick ${coarseTick}`);
+console.log(`  fine trail (1 tick)     : tick ${hashTick}`);
+console.log(`  visually noticeable     : tick ${visibleTick}`);
 console.log(
-  `  hash'in avantajı   : ${(visibleTick ?? 0) - (hashTick ?? 0)} tick (${(((visibleTick ?? 0) - (hashTick ?? 0)) / TICK_RATE).toFixed(1)} sn)`,
+  `  hash advantage          : ${(visibleTick ?? 0) - (hashTick ?? 0)} ticks (${(((visibleTick ?? 0) - (hashTick ?? 0)) / TICK_RATE).toFixed(1)} s)`,
 );
-console.log(`  final hash         : 0x${hex(recording.finalHash)}`);
+console.log(`  final hash              : 0x${hex(recording.finalHash)}`);

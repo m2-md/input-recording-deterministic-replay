@@ -1,6 +1,6 @@
 /**
- * Girdi tek bir tamsayıdır: her tuş bir bit.
- * Kayıt formatının bu kadar ucuz olmasının sebebi bu.
+ * An input is a single integer: each key corresponds to one bit.
+ * This is why the recording format is so lightweight.
  */
 export type InputBits = number;
 
@@ -15,7 +15,7 @@ export function has(input: InputBits, bit: number): boolean {
   return (input & bit) !== 0;
 }
 
-/** HUD ve hata mesajları için okunur biçim: "THRUST|LEFT" */
+/** Human-readable format for HUD and error messages: "THRUST|LEFT" */
 export function formatInput(input: InputBits): string {
   if (input === NONE) return "-";
   const parts: string[] = [];

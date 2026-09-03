@@ -35,7 +35,7 @@ let rng: Rng = mulberry32(seed);
 let recorder: Recorder | null = null;
 let recording: Recording | null = null;
 let playback: { inputs: InputBits[]; index: number } | null = null;
-let status = "CANLI";
+let status = "LIVE";
 let held: InputBits = NONE;
 
 function resetLive(): void {
@@ -51,18 +51,18 @@ function toggleRecording(): void {
     recorder = null;
     const check = verifyRecording(recording);
     status = check.ok
-      ? `kayıt kapandı · ${recording.ticks} tick · doğrulandı`
-      : `kayıt kapandı · AYRILMA @ tick ${check.divergedAt}`;
+      ? `recording finished · ${recording.ticks} ticks · verified`
+      : `recording finished · DIVERGENCE @ tick ${check.divergedAt}`;
   } else {
     resetLive();
     recorder = new Recorder(seed, TICK_RATE, 30);
-    status = "KAYIT";
+    status = "RECORDING";
   }
 }
 
 function startReplay(): void {
   if (!recording) {
-    status = "önce R ile bir oturum kaydet";
+    status = "record a session with R first";
     return;
   }
   recorder = null;
@@ -77,8 +77,8 @@ function stepOnce(): void {
     if (playback.index >= playback.inputs.length) {
       const ok = recording && hashState(state) === recording.finalHash;
       status = ok
-        ? "REPLAY BİTTİ · hash eşleşti"
-        : "REPLAY BİTTİ · hash TUTMADI";
+        ? "REPLAY FINISHED · hash matched"
+        : "REPLAY FINISHED · hash MISMATCH";
       playback = null;
       return;
     }
@@ -124,15 +124,15 @@ function hudText(): string {
   const ticks = recorder ? recorder.length : (recording?.ticks ?? 0);
   const blocks = recorder ? recorder.runCount : (recording?.runs.length ?? 0);
   return [
-    `mod          : ${status}`,
-    `tohum        : ${seed}`,
+    `mode         : ${status}`,
+    `seed         : ${seed}`,
     `tick         : ${state.tick}`,
     `hash         : 0x${hex(hashState(state))}`,
-    `girdi        : ${formatInput(playback ? (playback.inputs[playback.index - 1] ?? NONE) : held)}`,
-    `atlatma/çarpma: ${state.dodged} / ${state.hits}`,
-    `kayıt        : ${ticks} tick · ${blocks} blok · ${bytes} B`,
+    `input        : ${formatInput(playback ? (playback.inputs[playback.index - 1] ?? NONE) : held)}`,
+    `dodged/hits  : ${state.dodged} / ${state.hits}`,
+    `recording    : ${ticks} ticks · ${blocks} blocks · ${bytes} B`,
     ``,
-    `↑/W veya boşluk: itki · ←/→: yan · R: kayıt aç-kapa · P: replay`,
+    `↑/W or Space: thrust · ←/→: steer · R: toggle record · P: replay`,
   ].join("\n");
 }
 
@@ -147,7 +147,7 @@ function frame(now: number): void {
     stepOnce();
   }
   render(ctx, state, playback !== null);
-  recordBtn.textContent = recorder ? "Kaydı bitir (R)" : "Kaydet (R)";
+  recordBtn.textContent = recorder ? "Stop recording (R)" : "Record (R)";
   hud.textContent = hudText();
   requestAnimationFrame(frame);
 }

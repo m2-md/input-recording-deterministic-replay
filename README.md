@@ -1,41 +1,44 @@
-# Kanyon — Girdi Kaydı ve Deterministik Replay (Kara Kutu)
+# Canyon — Input Recording and Deterministic Replay (Black Box)
 
-"Kara Kutu: Girdi Kaydı ve Deterministik Replay ile 'Bazen Oluyor' Bug'ını Teste
-Çevirmek" makalesinin çalışan kodu. Küçük ama tam bir canvas oyunu (**Kanyon**),
-tohum + kare başına girdiden ibaret bir kayıt formatı ve 21 test.
+Working code for the article "Black Box: Turning the 'It Happens Sometimes' Bug Into a
+Test With Input Recording and Deterministic Replay". A small but complete canvas game
+(**Canyon**), a recording format that is nothing but a seed plus per-frame input, and
+21 tests.
 
-Fikir tek cümle: simülasyon deterministikse durumu kaydetmeye gerek yok. Tohumu ve
-tick başına girdiyi saklarsanız, `step`'i baştan koşturarak bütün oturumu geri
-getirebilirsiniz. Otuz saniyelik bir oynanış 11 KB'lık bir JSON ve 0.39 ms'lik bir
-regresyon testine iniyor.
+The idea in one sentence: if the simulation is deterministic, there is no need to record
+state. If you store the seed and the input per tick, you can bring back the entire session
+by re-running `step` from the beginning. Thirty seconds of gameplay comes down to an 11 KB
+JSON file and a 0.39 ms regression test.
 
-## İçerik
+## Contents
 
-- `src/sim.ts` — oyunun tek gerçeği: `State`, `createState`, saf `step(state, input, dt, rng)`,
-  ve test pilotu `panicPilot`. DOM yok, `Math.random` yok, `Date` yok.
-- `src/input.ts` — girdi tek bir tamsayı: `THRUST | LEFT | RIGHT` bit maskesi. Kayıt
-  formatının ucuzluğu buradan geliyor.
-- `src/rng.ts` — `mulberry32(seed)`: tohumlu PRNG.
-- `src/hash.ts` — `hashState`: bütün durumu tek 32-bit sayıya indiren FNV-1a (`-0` tuzağı kapalı).
-- `src/recording.ts` — kayıt formatı ve araçları: `encodeRuns`/`decodeRuns` (RLE),
-  `Recorder`, `replayWithTrail` (enjekte edilebilir `stepFn`), `findDivergence`,
+- `src/sim.ts` — the single source of truth for the game: `State`, `createState`, the pure
+  `step(state, input, dt, rng)`, and the test pilot `panicPilot`. No DOM, no `Math.random`,
+  no `Date`.
+- `src/input.ts` — input is a single integer: the `THRUST | LEFT | RIGHT` bitmask. This is
+  where the cheapness of the recording format comes from.
+- `src/rng.ts` — `mulberry32(seed)`: seeded PRNG.
+- `src/hash.ts` — `hashState`: FNV-1a reducing the whole state to a single 32-bit number
+  (the `-0` trap closed).
+- `src/recording.ts` — the recording format and its tools: `encodeRuns`/`decodeRuns` (RLE),
+  `Recorder`, `replayWithTrail` (with an injectable `stepFn`), `findDivergence`,
   `verifyRecording`, `serialize`/`parseRecording`.
-- `src/session.ts` — `recordSession(seed, pilot, ticks, trailEvery)`: headless oturum kaydı.
-- `src/render.ts` — SADECE çizer; replay modunda paleti değiştirir.
-- `src/main.ts` + `index.html` — tarayıcı yüzü: klavye → `InputBits`, sabit adımlı döngü,
-  `R`/Kaydet ve `P`/Replay düğmeleri, HUD'da tohum · tick · hash · kaydın boyutu.
-- `scripts/make-fixture.ts` — fixture üretir ve istatistik basar.
-- `scripts/bench.ts` — kayıt boyutu (ham vs RLE) ve replay hızı ölçümü.
-- `test/` — 21 test: kayıt→replay, RLE round-trip, bozuk kayıt, `findDivergence`,
-  desync avı, ve diskteki fixture'ın regresyon testi.
+- `src/session.ts` — `recordSession(seed, pilot, ticks, trailEvery)`: headless session recording.
+- `src/render.ts` — it ONLY draws; it swaps the palette in replay mode.
+- `src/main.ts` + `index.html` — the browser face: keyboard → `InputBits`, fixed-timestep loop,
+  `R`/Record and `P`/Replay buttons, seed · tick · hash · recording size in the HUD.
+- `scripts/make-fixture.ts` — generates the fixture and prints statistics.
+- `scripts/bench.ts` — measures recording size (raw vs RLE) and replay speed.
+- `test/` — 21 tests: record→replay, RLE round-trip, corrupt recording, `findDivergence`,
+  desync hunting, and the regression test for the fixture on disk.
 
-## Kurulum
+## Setup
 
 ```bash
 npm install
 ```
 
-## Çalıştırma
+## Running
 
 ### Demo
 
@@ -43,21 +46,22 @@ npm install
 npm run dev
 ```
 
-`http://localhost:5173/` → **Kaydet (R)** ile kayda başlayın (oyun baştan başlar),
-uçun, tekrar **Kaydet (R)** ile bitirin, **Replay (P)** ile geri oynatın. Replay
-bitince HUD'da `REPLAY BİTTİ · hash eşleşti` yazmalı.
+`http://localhost:5173/` → start recording with **Record (R)** (the game restarts), fly
+around, finish with **Record (R)** again, and play it back with **Replay (P)**. When the
+replay ends, the HUD should read `REPLAY FINISHED · hash matched`.
 
-Tuşlar: `↑`/`W`/boşluk itki, `←`/`→` yan itki, `R` kayıt aç-kapa, `P` replay.
+Keys: `↑`/`W`/space thrust, `←`/`→` lateral thrust, `R` toggle recording, `P` replay.
 
-> `file://` ile açmayın; modüller yüklenmez, ekran boş kalır. Vite şart.
+> Do not open it over `file://`; the modules will not load and the screen stays blank.
+> Vite is required.
 
-### Testler
+### Tests
 
 ```bash
 npm test
 ```
 
-Beklenen çıktı:
+Expected output:
 
 ```
  ✓ test/divergence.test.ts (4 tests) 1ms
@@ -71,58 +75,58 @@ Beklenen çıktı:
       Tests  21 passed (21)
 ```
 
-Testler `node` ortamında koşar — `document` YOK, canvas YOK. `environment: "jsdom"`
-ayarlamayın; testlerin tamamı saf mantığa dayanıyor.
+The tests run in the `node` environment — NO `document`, NO canvas. Do not set
+`environment: "jsdom"`; all of the tests rest on pure logic.
 
-### Fixture üretimi
+### Generating the fixture
 
 ```bash
 npm run fixture
 ```
 
 ```
-kayıt yazıldı: <repo>/test/fixtures/canyon-session.json
-  tohum        : 20260723
-  tick         : 1800 (30 sn)
-  run bloğu    : 417
-  sıkıştırma   : 7200 B ham → 1668 B run (4.3x)
-  JSON boyutu  : 11213 B
-  hash örneği  : 60
+recording written: <repo>/test/fixtures/canyon-session.json
+  seed         : 20260723
+  tick         : 1800 (30 s)
+  run blocks   : 417
+  compression  : 7200 B raw → 1668 B run (4.3x)
+  JSON size    : 11213 B
+  hash samples : 60
   final hash   : 0x4aad1b72
-  atlatılan    : 82 · çarpma: 4
+  dodged       : 82 · hits: 4
 ```
 
-Fixture repoya commit edilir; `test/regression.test.ts` onu okuyup oynatır. Çıktı
-değiştiyse önce `findDivergence` ile nerede ayrıldığına bakın, hash'i körlemesine
-yenilemeyin.
+The fixture is committed to the repo; `test/regression.test.ts` reads it and replays it. If
+the output has changed, first look at where it diverged with `findDivergence` — do not blindly
+refresh the hash.
 
-### Bench — kayıt boyutu + replay hızı
+### Bench — recording size + replay speed
 
 ```bash
 npm run bench
 ```
 
-Beklenen çıktı (süreler makineye göre değişir; blok/bayt sayıları sabittir):
+Expected output (timings vary by machine; block/byte counts are fixed):
 
 ```
-Kanyon — kayıt boyutu + replay hızı
-sahne: tohum=20260723 · 1800 tick (30.0 sn sim) · 50 koşu, 20 ısınma
+Canyon — recording size + replay speed
+scene: seed=20260723 · 1800 ticks (30.0 s sim) · 50 runs, 20 warmup
 
-replay hızı
-  replay (hashsiz)   : 0.39 ms · 4622 kare/ms · gerçek zamanın 77,030x'i
-  replay + her tick hash: 4.24 ms · 424 kare/ms
+replay speed
+  replay (no hash)        : 0.39 ms · 4622 frames/ms · 77,030x real-time
+  replay + hash per tick  : 4.24 ms · 424 frames/ms
 
-kayıt boyutu
-  bot pilot          : 1800 tick → 417 blok · 7200 B ham → 1668 B run (4.3x)
-  insan benzeri girdi: 3600 tick → 123 blok · 14400 B ham → 492 B run (29.3x)
-  JSON kayıt dosyası : 11213 B
+recording size
+  bot pilot               : 1800 ticks → 417 blocks · 7200 B raw → 1668 B run (4.3x)
+  human-like input        : 3600 ticks → 123 blocks · 14400 B raw → 492 B run (29.3x)
+  JSON recording file     : 11213 B
 
-desync görünürlüğü (spawnTimer += 1e-6 @ tick 300)
-  kaba iz (30 tick)  : tick 330
-  ince iz (1 tick)   : tick 301
-  gözle görülür fark : tick 384
-  hash'in avantajı   : 83 tick (1.4 sn)
-  final hash         : 0x4aad1b72
+desync visibility (spawnTimer += 1e-6 @ tick 300)
+  coarse trail (30 ticks) : tick 330
+  fine trail (1 tick)     : tick 301
+  visually noticeable     : tick 384
+  hash advantage          : 83 ticks (1.4 s)
+  final hash              : 0x4aad1b72
 ```
 
 ### Production build
@@ -132,41 +136,42 @@ npm run build   # tsc && vite build
 npm run preview
 ```
 
-## Dosya yapısı
+## File layout
 
 ```
 index.html
 src/
-  input.ts        # InputBits bit maskesi
+  input.ts        # InputBits bitmask
   rng.ts          # mulberry32
   sim.ts          # State, createState, step, panicPilot
   hash.ts         # hashState (FNV-1a), hex
   recording.ts    # RLE + Recorder + replay + findDivergence + verify + parse
-  session.ts      # recordSession (headless oturum)
-  render.ts       # sadece çizim
-  main.ts         # demo: klavye, düğmeler, sabit adımlı döngü, HUD
+  session.ts      # recordSession (headless session)
+  render.ts       # drawing only
+  main.ts         # demo: keyboard, buttons, fixed-timestep loop, HUD
 scripts/
-  make-fixture.ts # test/fixtures/canyon-session.json üretir
-  bench.ts        # boyut + hız ölçümü
+  make-fixture.ts # generates test/fixtures/canyon-session.json
+  bench.ts        # size + speed measurement
 test/
-  recording.test.ts   # kayıt→replay + RLE (9)
-  corruption.test.ts  # bozuk kayıt (4)
+  recording.test.ts   # record→replay + RLE (9)
+  corruption.test.ts  # corrupt recording (4)
   divergence.test.ts  # findDivergence (4)
-  desync.test.ts      # aynı kayıt, iki farklı build (1)
-  traps.test.ts       # Math.random tuzağı (1)
-  regression.test.ts  # diskteki fixture (2)
+  desync.test.ts      # same recording, two different builds (1)
+  traps.test.ts       # the Math.random trap (1)
+  regression.test.ts  # the fixture on disk (2)
   fixtures/canyon-session.json
 ```
 
-## Alınan dersler (makalede de anlatılır)
+## Lessons learned (also covered in the article)
 
-- Hash izinin çözünürlüğü örnekleme aralığı kadardır: 30 tick aralıkla ayrılma
-  330'da görünüyor, gerçek ayrılma 301'de. Önce kaba izle pencereyi bulun, sonra
-  `trailEvery: 1` ile tam tick'i.
-- Kaymayı `ship.vy`'ye vermek işe yaramaz: duvar kırpması `vy = 0` yazıp kaymayı siler.
-  `spawnTimer` gibi sürekli biriken bir alan seçin.
-- Kayıt, alındığı `step` sürümüne aittir. `Recording.version` bunun için var.
+- A hash trail's resolution is only as fine as its sampling interval: with a 30-tick
+  interval the divergence shows up at 330, while the real divergence is at 301. Find the
+  window with the coarse trail first, then the exact tick with `trailEvery: 1`.
+- Injecting the drift into `ship.vy` does not work: wall clamping writes `vy = 0` and erases
+  the drift. Pick a field that accumulates continuously, like `spawnTimer`.
+- A recording belongs to the version of `step` it was taken with. That is what
+  `Recording.version` is for.
 
-## Lisans
+## License
 
 MIT

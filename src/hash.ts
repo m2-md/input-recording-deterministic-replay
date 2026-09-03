@@ -1,6 +1,6 @@
 import type { State } from "./sim";
 
-// Bir float'ın 64 bitini iki 32-bit parçaya bakmak için tek tampon.
+// Single buffer to inspect the 64 bits of a float as two 32-bit halves.
 const buf = new ArrayBuffer(8);
 const f64 = new Float64Array(buf);
 const u32 = new Uint32Array(buf);
@@ -16,13 +16,13 @@ function mixU32(h: number, v: number): number {
   return h >>> 0;
 }
 
-/** Sayıyı bit bit karıştır: 0.1 ile 0.100000001 farklı hash verir. */
+/** Mix number bit-by-bit: 0.1 vs 0.100000001 yields different hashes. */
 export function mixNumber(h: number, x: number): number {
-  f64[0] = x + 0; // -0'ı +0'a çevirir; duvar kırpması -0 üretebiliyor
+  f64[0] = x + 0; // converts -0 to +0; wall clamping can produce -0
   return mixU32(mixU32(h, u32[0]), u32[1]);
 }
 
-/** Bütün simülasyon durumunu tek 32-bit sayıya indirger (FNV-1a). */
+/** Hashes entire simulation state into a single 32-bit number (FNV-1a). */
 export function hashState(s: State): number {
   let h = FNV_OFFSET >>> 0;
   h = mixNumber(h, s.tick);
@@ -46,7 +46,7 @@ export function hashState(s: State): number {
   return h >>> 0;
 }
 
-/** HUD ve kayıt başlıkları için 8 haneli hex. */
+/** 8-digit hex for HUD and recording headers. */
 export function hex(h: number): string {
   return h.toString(16).padStart(8, "0");
 }
