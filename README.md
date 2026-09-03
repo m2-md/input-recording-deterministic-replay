@@ -1,5 +1,9 @@
 # Canyon — Input Recording and Deterministic Replay (Black Box)
 
+<!-- LINKS:BEGIN — üretildi: scripts/sync-repo-links.py · elle düzenleme -->
+**▶ [Live demo](https://m2-md.github.io/input-recording-deterministic-replay/)** · [Source](https://github.com/m2-md/input-recording-deterministic-replay)
+<!-- LINKS:END -->
+
 Working code for the article "Black Box: Turning the 'It Happens Sometimes' Bug Into a
 Test With Input Recording and Deterministic Replay". A small but complete canvas game
 (**Canyon**), a recording format that is nothing but a seed plus per-frame input, and
